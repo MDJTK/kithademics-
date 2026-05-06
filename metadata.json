@@ -1,6 +1,6 @@
 {
-  "name": "Kithademics - Modern Islamic Ed-Tech",
-  "description": "A structured, authentic, and professional digital learning platform for Islamic sciences, combining traditional scholarship with modern technology.",
+  "name": "Kithademics - Islamic Ed-Tech",
+  "description": "A refined digital learning platform for Islamic sciences, combining traditional scholarship with modern educational technology.",
   "requestFramePermissions": [
     "camera",
     "microphone"

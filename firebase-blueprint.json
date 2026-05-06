@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Stores user basic information and global statistics.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "streak": { "type": "integer" },
+        "studyTimeHours": { "type": "integer" },
+        "recentlyWatchedCourseId": { "type": "string" },
+        "membershipType": { "type": "string", "enum": ["free", "pro", "admin"] }
+      },
+      "required": ["displayName", "email", "createdAt"]
+    },
+    "course": {
+      "title": "Course",
+      "description": "A course with multiple lessons.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "instructor": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "isLocked": { "type": "boolean" },
+        "lessons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "duration": { "type": "string" },
+              "videoUrl": { "type": "string" },
+              "thumbnail": { "type": "string" }
+            }
+          }
+        },
+        "order": { "type": "integer" }
+      }
+    },
+    "spotlight": {
+      "title": "Spotlight",
+      "description": "Header poster message and image.",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" },
+        "title": { "type": "string" },
+        "quote": { "type": "string" },
+        "author": { "type": "string" },
+        "active": { "type": "boolean" }
+      }
+    },
+    "enrollment": {
+      "title": "Enrollment",
+      "description": "User enrollment status for a specific course.",
+      "type": "object",
+      "properties": {
+        "enrolledAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "expired"] }
+      }
+    },
+    "courseProgress": {
+      "title": "Course Progress",
+      "description": "Tracks which lessons a user has completed in a specific course.",
+      "type": "object",
+      "properties": {
+        "completedLessonIds": { 
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lastAccessedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["completedLessonIds", "lastAccessedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Private profile information for a user."
+    },
+    "/users/{userId}/enrollments/{courseId}": {
+      "schema": "enrollment",
+      "description": "Subscription or enrollment details for a course."
+    },
+    "/users/{userId}/progress/{courseId}": {
+      "schema": "courseProgress",
+      "description": "Lesson-level completion data for a specific user and course."
+    },
+    "/courses/{courseId}": {
+      "schema": "course",
+      "description": "Course content data."
+    },
+    "/spotlight/main": {
+      "schema": "spotlight",
+      "description": "Main spotlight configuration."
+    }
+  }
+}

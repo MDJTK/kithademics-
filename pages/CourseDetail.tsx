@@ -16,11 +16,9 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack, onPlayLesso
       <div className="bg-white sticky top-0 z-50 border-b border-slate-100 shadow-sm px-6 py-4 flex items-center space-x-4">
         <button 
           onClick={onBack} 
-          className="p-2 -ml-2 hover:bg-slate-50 rounded-full transition-colors text-slate-600"
+          className="p-2 -ml-2 hover:bg-slate-50 rounded-full transition-colors text-slate-600 flex items-center justify-center font-bold"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
+          <i className="fi fi-rr-angle-left"></i>
         </button>
         <h1 className="font-bold text-slate-800 text-lg">Course Overview</h1>
       </div>
@@ -77,9 +75,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack, onPlayLesso
                   <img src={lesson.thumbnail || course.thumbnail} alt={lesson.title} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                     <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-sm scale-90 group-hover:scale-100 transition-transform">
-                       <svg className="w-3 h-3 text-emerald-600 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                       </svg>
+                       <i className="fi fi-rr-play text-emerald-600 text-[10px] ml-0.5"></i>
                     </div>
                   </div>
                 </div>
@@ -98,9 +94,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack, onPlayLesso
 
                 {/* Arrow */}
                 <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg className="w-5 h-5 text-slate-300 group-hover:text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
+                  <i className="fi fi-rr-angle-small-right text-slate-300 group-hover:text-emerald-500 text-xl"></i>
                 </div>
               </div>
             ))}

@@ -1,20 +1,35 @@
 
 import React, { useState } from 'react';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../lib/firebase';
 
 interface LoginProps {
   onLogin: (name: string) => void;
 }
 
 const LogoIcon = () => (
-  <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M50 5L61.2 21.2L80 20L78.8 38.8L95 50L78.8 61.2L80 80L61.2 78.8L50 95L38.8 78.8L20 80L21.2 61.2L5 50L21.2 38.8L20 20L38.8 21.2L50 5Z" stroke="#1a4731" strokeWidth="4" />
-    <text x="50" y="60" textAnchor="middle" fill="#1a4731" fontSize="35" fontWeight="bold" className="serif-font">K</text>
-  </svg>
+  <div className="w-16 h-16 bg-white border-2 border-emerald-900 rounded-[1.5rem] flex items-center justify-center relative transform rotate-12 mx-auto shadow-sm">
+     <i className="fi fi-rr-star text-emerald-900 text-2xl -rotate-12 translate-y-[-1px]"></i>
+  </div>
 );
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [method, setMethod] = useState<'email' | 'mobile'>('email');
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        onLogin(result.user.displayName || 'Student');
+      }
+    } catch (error) {
+      console.error("Login failed", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,11 +69,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="w-full space-y-3">
           {/* Social Logins */}
           <button 
-            onClick={() => onLogin("Google User")}
-            className="w-full bg-white border border-slate-200 text-slate-700 font-semibold py-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center shadow-sm hover:shadow-md"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            className="w-full bg-white border border-slate-200 text-slate-700 font-semibold py-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center shadow-sm hover:shadow-md disabled:opacity-50"
           >
-            <GoogleIcon />
-            Continue with Google
+            <i className="fi fi-brands-google mr-3"></i>
+            {isLoading ? "Authenticating..." : "Continue with Google"}
           </button>
 
           <div className="flex items-center py-4">

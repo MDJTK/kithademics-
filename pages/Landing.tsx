@@ -18,10 +18,9 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       <div className="w-full max-w-lg text-center z-10 space-y-10">
         <div className="flex flex-col items-center">
           <div className="mb-6">
-            <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
-              <path d="M50 5L61.2 21.2L80 20L78.8 38.8L95 50L78.8 61.2L80 80L61.2 78.8L50 95L38.8 78.8L20 80L21.2 61.2L5 50L21.2 38.8L20 20L38.8 21.2L50 5Z" stroke="#1a4731" strokeWidth="4" />
-              <text x="50" y="62" textAnchor="middle" fill="#1a4731" fontSize="35" fontWeight="bold" className="serif-font">K</text>
-            </svg>
+            <div className="w-20 h-20 bg-white border-2 border-emerald-900 rounded-[2rem] flex items-center justify-center relative transform rotate-12 mx-auto">
+               <i className="fi fi-rr-star text-emerald-900 text-3xl -rotate-12 translate-y-[-2px]"></i>
+            </div>
           </div>
           <h2 className="text-emerald-dark text-xs font-bold uppercase tracking-[0.4em] mb-4">Welcome to KithAdemics</h2>
           <h1 className="serif-font text-3xl md:text-5xl text-slate-900 font-bold leading-tight mb-4">
@@ -42,9 +41,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
             />
             <div className="absolute inset-0 bg-emerald-950/20 group-hover:bg-emerald-950/40 transition-colors flex items-center justify-center">
               <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 transition-transform">
-                <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                </svg>
+                <i className="fi fi-rr-play text-white text-3xl ml-1 leading-none"></i>
               </div>
             </div>
             <div className="absolute top-4 right-4">

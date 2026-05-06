@@ -19,6 +19,7 @@ export interface Course {
   lessons: Lesson[];
   price: string;
   isLocked: boolean;
+  order?: number;
 }
 
 export interface UserProgress {

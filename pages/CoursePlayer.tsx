@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Course, Lesson } from '../types';
+import { firebaseService } from '../services/firebaseService';
+import { auth } from '../lib/firebase';
 
 interface CoursePlayerProps {
   course: Course;
   onBack: () => void;
   initialLessonId?: string;
+  onProgressUpdate: (lessonId: string, isCompleted: boolean) => void;
 }
 
-const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLessonId }) => {
+const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLessonId, onProgressUpdate }) => {
   const [activeLesson, setActiveLesson] = useState<Lesson>(() => {
     if (initialLessonId) {
       const found = course.lessons.find(l => l.id === initialLessonId);
@@ -48,23 +51,47 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
     }
   };
 
-  // Handle Confirm Action
-  const handleConfirmComplete = () => {
+  // Handle Confirm Action with auto-redirect and Firebase sync
+  const handleConfirmComplete = async () => {
     setIsAnimating(true);
     
+    const userId = auth.currentUser?.uid;
+    if (userId) {
+      // Get current list of completed IDs
+      const completedIds = course.lessons
+        .filter(l => l.isCompleted || l.id === activeLesson.id)
+        .map(l => l.id);
+      
+      try {
+        await firebaseService.updateCourseProgress(userId, course.id, completedIds);
+        onProgressUpdate(activeLesson.id, true);
+      } catch (error) {
+        console.error("Failed to sync progress", error);
+      }
+    }
+
     setTimeout(() => {
       setActiveLesson(prev => ({
         ...prev,
-        isCompleted: !prev.isCompleted
+        isCompleted: true
       }));
       setIsAnimating(false);
       setShowCompleteModal(false);
-    }, 1200);
+
+      // Auto-redirect to next lesson if it exists
+      if (nextLesson) {
+        setTimeout(() => {
+          setActiveLesson(nextLesson);
+          setIsPlaying(false);
+        }, 800);
+      }
+    }, 1500);
   };
 
   // Find next lesson
   const activeLessonIndex = course.lessons.findIndex(l => l.id === activeLesson.id);
   const nextLesson = course.lessons[activeLessonIndex + 1];
+  const progressLabel = `${activeLessonIndex + 1} of ${course.lessons.length}`;
 
   // Construct YouTube URL with origin for API security
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -76,17 +103,19 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
         {/* Video Area */}
         <div className="flex-1 flex flex-col h-full overflow-y-auto scrollbar-hide">
           {/* Header */}
-          <div className="bg-white px-4 py-3 flex items-center border-b border-slate-100 sticky top-0 z-20">
+          <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100 sticky top-0 z-20">
             <div className="flex items-center space-x-3">
               <button onClick={onBack} className="p-2 hover:bg-slate-50 rounded-full text-slate-600 transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
+                <i className="fi fi-rr-angle-left flex items-center justify-center"></i>
               </button>
               <div>
                 <h1 className="font-bold text-slate-900 leading-tight text-sm line-clamp-1">{course.title}</h1>
                 <p className="text-[10px] text-slate-500 line-clamp-1">{activeLesson.title}</p>
               </div>
+            </div>
+            <div className="flex items-center bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+               <i className="fi fi-rr-book-open-reader text-emerald-600 text-xs mr-2"></i>
+               <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest">{progressLabel}</span>
             </div>
           </div>
 
@@ -94,7 +123,7 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
           <div className="w-full bg-black aspect-video relative group shrink-0 overflow-hidden select-none">
             <iframe
               ref={iframeRef}
-              className="w-full h-full object-cover pointer-events-none" 
+              className="w-full h-full object-cover pointer-events-none scale-105" 
               src={videoSrc}
               title="YouTube video player"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -110,52 +139,50 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
             {/* Centered Play Button (Visible only when paused) */}
             {!isPlaying && (
               <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/30 z-20 pointer-events-none transition-opacity duration-300"
+                className="absolute inset-0 flex items-center justify-center bg-black/40 z-20 pointer-events-none transition-opacity duration-300"
               >
-                <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-600/90 rounded-full flex items-center justify-center backdrop-blur-sm shadow-xl animate-in zoom-in duration-200">
-                  <svg className="w-8 h-8 md:w-10 md:h-10 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                  </svg>
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-600/90 rounded-full flex items-center justify-center backdrop-blur-md shadow-2xl transition-transform animate-in zoom-in duration-300">
+                  <i className="fi fi-rr-play text-white text-3xl ml-1 leading-none"></i>
                 </div>
               </div>
             )}
             
             {/* Custom Controls Overlay */}
-            <div className={`absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col space-y-4 transition-opacity duration-300 z-30 ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
+            <div className={`absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex flex-col space-y-4 transition-all duration-300 z-30 ${isPlaying ? 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0' : 'opacity-100 translate-y-0'}`}>
               {/* Progress Bar (Visual Demo) */}
-              <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden cursor-pointer group/progress" onClick={(e) => e.stopPropagation()}>
-                <div className="bg-emerald-500 h-full w-1/3 relative">
-                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover/progress:opacity-100"></div>
+              <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden cursor-pointer group/progress relative" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-emerald-500 h-full w-1/3 relative transition-all">
+                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 scale-0 group-hover/progress:scale-100 transition-all"></div>
                 </div>
               </div>
               
               <div className="flex items-center justify-between text-white" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center space-x-4 md:space-x-6">
-                  <button onClick={handlePlayPause} className="hover:text-emerald-400 transition-colors focus:outline-none">
+                <div className="flex items-center space-x-5 md:space-x-8">
+                  <button onClick={handlePlayPause} className="hover:text-emerald-400 transition-colors focus:outline-none flex items-center">
                     {isPlaying ? (
-                       <svg className="w-6 h-6 md:w-7 md:h-7" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                       <i className="fi fi-rr-pause text-2xl"></i>
                     ) : (
-                       <svg className="w-6 h-6 md:w-7 md:h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                       <i className="fi fi-rr-play text-2xl"></i>
                     )}
                   </button>
                   
                   {/* Volume (Mock) */}
-                  <div className="group/vol flex items-center space-x-2">
-                     <button className="focus:outline-none"><svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg></button>
-                     <div className="w-0 overflow-hidden group-hover/vol:w-20 transition-all duration-300">
-                        <div className="h-1 bg-white/30 rounded-full w-16 ml-2">
-                           <div className="h-full bg-white w-2/3"></div>
+                  <div className="group/vol flex items-center space-x-3">
+                     <button className="focus:outline-none hover:text-emerald-400 transition-colors"><i className="fi fi-rr-volume-high text-xl"></i></button>
+                     <div className="hidden md:block w-0 overflow-hidden group-hover/vol:w-24 transition-all duration-300">
+                        <div className="h-1 bg-white/30 rounded-full w-20 ml-1">
+                           <div className="h-full bg-emerald-500 w-2/3 rounded-full"></div>
                         </div>
                      </div>
                   </div>
 
-                  <span className="text-[10px] md:text-xs font-medium tabular-nums">04:20 / {activeLesson.duration}</span>
+                  <span className="text-[10px] md:text-xs font-bold tracking-widest tabular-nums font-mono opacity-80">04:20 / {activeLesson.duration}</span>
                 </div>
                 
-                <div className="flex items-center space-x-4">
-                  <button className="text-[10px] md:text-xs font-bold bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition-colors">1.0x</button>
-                  <button className="hover:text-emerald-400 transition-colors focus:outline-none">
-                    <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                <div className="flex items-center space-x-5">
+                  <button className="text-[10px] font-bold bg-white/10 hover:bg-emerald-600/30 px-3 py-1.5 rounded-lg border border-white/5 transition-all">1.25x</button>
+                  <button className="hover:text-emerald-400 transition-transform hover:scale-110 active:scale-95 focus:outline-none">
+                    <i className="fi fi-rr-expand text-xl"></i>
                   </button>
                 </div>
               </div>
@@ -164,54 +191,42 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
 
           {/* Content Area below video */}
           <div className="p-6 md:p-10 text-slate-800 max-w-3xl mx-auto w-full">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-              <h2 className="serif-font text-2xl md:text-3xl font-bold">{activeLesson.title}</h2>
-              <div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
+              <h2 className="serif-font text-2xl md:text-3xl font-bold tracking-tight text-emerald-950">{activeLesson.title}</h2>
+              <div className="shrink-0">
                 <button
                   onClick={() => setShowCompleteModal(true)}
-                  className={`flex items-center space-x-2.5 px-5 py-2.5 rounded-full border transition-all duration-300 ${
+                  className={`flex items-center space-x-3 px-6 py-3 rounded-2xl border transition-all duration-500 shadow-sm ${
                     activeLesson.isCompleted
-                      ? 'bg-emerald-100 border-emerald-200 text-emerald-800'
-                      : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-500 hover:text-emerald-600'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-600 hover:text-emerald-700 hover:shadow-lg hover:shadow-emerald-600/10'
                   }`}
                 >
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                     activeLesson.isCompleted ? 'bg-emerald-500 border-emerald-500' : 'border-current'
-                  }`}>
-                    {activeLesson.isCompleted && (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
+                  <i className={`fi ${activeLesson.isCompleted ? 'fi-rr-check-circle' : 'fi-rr-circle'} text-lg`}></i>
                   <span className="text-sm font-bold tracking-tight">
-                    {activeLesson.isCompleted ? 'Completed' : 'Mark as Complete'}
+                    {activeLesson.isCompleted ? 'Topic Completed' : 'Mark as Complete'}
                   </span>
                 </button>
               </div>
             </div>
 
-            <div className="prose max-w-none text-slate-600 leading-relaxed mb-10 text-sm md:text-base">
-              <p className="mb-4">
-                In this lesson, we explore the foundational principles of {course.title.split(':')[0]}.
-                The instructor provides a detailed analysis of traditional texts and how they apply to modern life.
+            <div className="prose max-w-none text-slate-600 leading-relaxed mb-12 text-sm md:text-base">
+              <p className="mb-6 opacity-80 font-medium">
+                In this segment of the curriculum, we delve into the rigorous methodologies used by traditional scholars. 
+                Emphasis is placed on understanding the context of the revelation and its application in contemporary jurisprudence.
               </p>
-              <h3 className="text-slate-900 font-bold text-lg mb-3">Key Takeaways</h3>
-              <ul className="list-disc list-inside space-y-2 mb-8">
-                <li>Understanding the historical context of the rulings.</li>
-                <li>Practical steps for daily implementation.</li>
-                <li>Common pitfalls and how to avoid them based on classic scholarship.</li>
-              </ul>
-              <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex items-start space-x-4">
-                <div className="w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+              
+              <div className="bg-emerald-50 rounded-[2rem] p-8 border border-emerald-100 flex items-start space-x-5 relative overflow-hidden group">
+                <div className="absolute -top-4 -right-4 text-emerald-100 opacity-50 group-hover:scale-110 transition-transform duration-700">
+                    <i className="fi fi-rr-quote-right text-8xl"></i>
                 </div>
-                <div>
-                  <h4 className="font-bold text-emerald-900 mb-1">Scholar's Note</h4>
-                  <p className="text-emerald-800 text-sm">
-                    "The purpose of knowledge is not simply the accumulation of facts, but the transformation of the heart and the rectification of actions."
+                <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-600/20 z-10">
+                   <i className="fi fi-rr-comment-info text-2xl"></i>
+                </div>
+                <div className="z-10">
+                  <h4 className="font-bold text-emerald-900 mb-2 uppercase text-xs tracking-widest">Scholar's Insight</h4>
+                  <p className="text-emerald-800 text-sm md:text-base leading-relaxed italic serif-font">
+                    "Seeking knowledge is a form of worship. The refinement of one's character through that knowledge is the ultimate fruit of the scholarship."
                   </p>
                 </div>
               </div>
@@ -219,32 +234,34 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
 
             {/* Next Video Section */}
             {nextLesson && (
-              <div className="mt-12 pt-8 border-t border-slate-100 animate-in slide-in-from-bottom-4 duration-700">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Up Next</h3>
+              <div className="mt-6 pt-10 border-t border-slate-100 animate-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Up Next</h3>
                 </div>
                 <button 
                   onClick={() => setActiveLesson(nextLesson)}
-                  className="w-full bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/5 rounded-2xl p-4 flex items-center text-left transition-all group"
+                  className="w-full bg-white border border-slate-200 hover:border-emerald-600 hover:shadow-2xl hover:shadow-emerald-600/5 rounded-[2rem] p-5 flex items-center text-left transition-all group overflow-hidden"
                 >
-                  <div className="w-24 h-16 md:w-32 md:h-20 bg-slate-200 rounded-xl overflow-hidden flex-shrink-0 relative">
-                    <img src={nextLesson.thumbnail || course.thumbnail} alt={nextLesson.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                  <div className="w-24 h-16 md:w-40 md:h-24 bg-slate-100 rounded-2xl overflow-hidden flex-shrink-0 relative">
+                    <img src={nextLesson.thumbnail || course.thumbnail} alt={nextLesson.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-sm scale-90 group-hover:scale-100 transition-transform">
-                        <svg className="w-4 h-4 text-emerald-600 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                        </svg>
+                      <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-all duration-300">
+                        <i className="fi fi-rr-play text-emerald-600 text-lg ml-0.5"></i>
                       </div>
                     </div>
                   </div>
-                  <div className="ml-4 flex-1 min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lesson {activeLessonIndex + 2}</span>
-                    <h4 className="font-bold text-slate-800 text-base md:text-lg group-hover:text-emerald-700 transition-colors truncate">{nextLesson.title}</h4>
-                    <p className="text-xs text-slate-500 mt-1">{nextLesson.duration}</p>
+                  <div className="ml-5 flex-1 min-w-0">
+                    <span className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-widest">Topic {activeLessonIndex + 2}</span>
+                    <h4 className="font-bold text-slate-900 text-lg md:text-xl group-hover:text-emerald-700 transition-colors truncate mb-1">{nextLesson.title}</h4>
+                    <div className="flex items-center text-slate-400 text-xs font-medium">
+                        <i className="fi fi-rr-clock-three mr-2 text-[10px]"></i>
+                        {nextLesson.duration}
+                    </div>
                   </div>
                   <div className="ml-4 hidden md:block">
-                     <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
-                       <svg className="w-5 h-5 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                     <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-emerald-600 group-hover:text-white transition-all transform group-hover:rotate-12">
+                       <i className="fi fi-rr-arrow-right text-xl"></i>
                      </div>
                   </div>
                 </button>
@@ -256,43 +273,38 @@ const CoursePlayer: React.FC<CoursePlayerProps> = ({ course, onBack, initialLess
         {/* Confirmation Modal */}
         {showCompleteModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => !isAnimating && setShowCompleteModal(false)}></div>
-             <div className="bg-white rounded-[2rem] p-8 max-w-xs w-full shadow-2xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
+             <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-md transition-opacity" onClick={() => !isAnimating && setShowCompleteModal(false)}></div>
+             <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-[0_20px_50px_rgba(26,71,49,0.3)] relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden text-center border border-white/50">
                 {isAnimating ? (
-                  <div className="flex flex-col items-center justify-center py-6 animate-in fade-in duration-300">
-                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 relative">
-                       <div className="absolute inset-0 rounded-full border-4 border-emerald-200 animate-[ping_1.5s_infinite]"></div>
-                       <svg className="w-10 h-10 text-emerald-600 animate-[bounce_1s_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                  <div className="flex flex-col items-center justify-center py-6 animate-in fade-in duration-500">
+                    <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-8 relative">
+                       <div className="absolute inset-0 rounded-full border-4 border-emerald-500 animate-[ping_1.5s_infinite] opacity-30"></div>
+                       <i className="fi fi-rr-check text-4xl text-emerald-600"></i>
                     </div>
-                    <h3 className="font-bold text-slate-800 text-lg text-center">
-                       {activeLesson.isCompleted ? 'Marked Incomplete' : 'Lesson Completed!'}
-                    </h3>
+                    <h3 className="serif-font font-bold text-emerald-950 text-2xl mb-2">Excellent Work!</h3>
+                    <p className="text-emerald-600/60 text-sm font-bold uppercase tracking-widest">Marking complete...</p>
                   </div>
                 ) : (
-                  <div className="text-center">
-                     <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                  <div>
+                     <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6 transform -rotate-6">
+                        <i className="fi fi-rr-trophy-star text-3xl text-emerald-600"></i>
                      </div>
-                     <h3 className="font-bold text-slate-800 text-lg mb-2">
-                       {activeLesson.isCompleted ? 'Undo Completion?' : 'Mark as Complete?'}
-                     </h3>
-                     <p className="text-slate-400 text-xs font-medium leading-relaxed mb-8 px-2">
-                       {activeLesson.isCompleted 
-                         ? 'Are you sure you want to mark this lesson as incomplete?' 
-                         : 'Are you sure you want to mark this lesson as finished?'}
+                     <h3 className="serif-font font-bold text-slate-900 text-2xl mb-3">Topic Finished?</h3>
+                     <p className="text-slate-400 text-sm font-medium leading-relaxed mb-10 px-4">
+                        Confirm completion to save your progress and unlock your next step in the journey.
                      </p>
-                     <div className="grid grid-cols-2 gap-3">
-                       <button 
-                         onClick={() => setShowCompleteModal(false)}
-                         className="py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition-colors"
-                       >
-                         Cancel
-                       </button>
+                     <div className="flex flex-col space-y-3">
                        <button 
                          onClick={handleConfirmComplete}
-                         className="py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                         className="w-full py-4 rounded-2xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 active:scale-[0.98]"
                        >
-                         Confirm
+                         Complete Topic
+                       </button>
+                       <button 
+                         onClick={() => setShowCompleteModal(false)}
+                         className="w-full py-4 rounded-2xl bg-slate-50 text-slate-500 font-bold text-sm hover:bg-slate-100 transition-colors"
+                       >
+                         Back to Lesson
                        </button>
                      </div>
                   </div>

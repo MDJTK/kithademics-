@@ -17,26 +17,26 @@ export class GeminiService {
   private ai: GoogleGenAI;
 
   constructor() {
-    // Fix: Always use { apiKey: process.env.API_KEY } directly as per Google GenAI guidelines
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
 
   async chat(history: ChatMessage[], message: string) {
-    const chat = this.ai.chats.create({
-      model: 'gemini-3-flash-preview',
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7,
-      },
-    });
-
-    // Note: The history in gemini-3-flash-preview is handled by providing it in the sendMessage context if needed, 
-    // but for simplicity in this demo we send the prompt with history context or use the chat session.
-    // For a real app, you'd map our ChatMessage[] to the API's expected format.
+    // Map our history format to the API's format if needed
+    // For single-turn or simple cases, we can just use generateContent
     
     try {
-      const response = await chat.sendMessage({ message });
-      // Fix: response.text is a property that returns the extracted string output
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+          ...history,
+          { role: 'user', parts: [{ text: message }] }
+        ],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.7,
+        },
+      });
+
       return response.text || "I apologize, but I'm unable to provide a response at the moment.";
     } catch (error) {
       console.error("Gemini Error:", error);
